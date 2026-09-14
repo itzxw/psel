@@ -84,34 +84,34 @@ int tun_alloc(char *dev) {
 }
 
 int check_payload(unsigned char *packet, int nread){
-    struct iphdr *iph = (struct iphdr *)packet;
-    int ip_header_len = iph->ihl * 4;
+    struct iphdr *iph = (struct iphdr *)packet;        // cast do cabeçalho ip
+    int ip_header_len = iph->ihl * 4;            // multiplicamos o 'ihl' (internet header length) * 4 pra saber o tamanho real (porque ele armazena em blocos de 32bits)
 
     unsigned char *payload = NULL;
     int payload_len = 0;
 
     if (iph->protocol == IPPROTO_TCP) {
-        if(ip_header_len + (int)sizeof(struct tcphdr) > nread) return 0;
+        if(ip_header_len + (int)sizeof(struct tcphdr) > nread) return 0;  // verifica se o tamanho do ip_header + tcp_header(o tamanho minímo) ultrapassa os bytes lidos
 
-        struct tcphdr *tcph = (struct tcphdr *)(packet + ip_header_len);
-        int tcp_header_len = tcph->doff *4;
+        struct tcphdr *tcph = (struct tcphdr *)(packet + ip_header_len); // avança o ponteiro para o tcp_header
+        int tcp_header_len = tcph->doff *4;  // tamanho atual do tcp_header
+        if(tcp_header_len < (int)sizeof(struct tcphdr)) return 0;  // verifica se o tamanho real equivale ao tamanho padrão (nunca pode ser menor)
 
-        if(tcp_header_len < (int)sizeof(struct tcphdr)) return 0;
-
-        payload = packet + ip_header_len + tcp_header_len;
-        payload_len = ntohs(iph->tot_len) - (ip_header_len + tcp_header_len);
+        payload = packet + ip_header_len + tcp_header_len;  // o payload começa logo depois do tcp_header
+        payload_len = ntohs(iph->tot_len) - (ip_header_len + tcp_header_len);  // tamanho do payload (tem que converter o tot_len de Network Byte Order pra Host Byte Order)
     }
     
     else if(iph->protocol == IPPROTO_UDP){
-        payload = packet + ip_header_len + 8;
+        payload = packet + ip_header_len + 8;    // o udp_header tem tamanho estático de 8 bytes
         payload_len = ntohs(iph->tot_len) - (ip_header_len + 8);
     } else {
+        // se não for tcp nem udp ignora;
         return 0;
     }
 
-    if(payload_len <= 0) return 0;
+    if(payload_len <= 0) return 0;      // caso em que não há dados
 
-    int payload_offset = payload - packet;
+    int payload_offset = payload - packet;  // offset onde o payload começa
 
     if(payload_offset + payload_len > nread) return 0; //pacote truncado/malformatado
 
