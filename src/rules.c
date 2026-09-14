@@ -12,17 +12,17 @@
 Rule* load_rules(const char *filename, int *total_rules){
     FILE* f = fopen(filename, "r");
     if (f == NULL){
-        printf("error in open the file");
+        printf("[X] Erro ao abir o arquivo de regras!");
         *total_rules = -1;
         return NULL;
     }
-    printf(" [+] iniciando carregamento das regras\n");
-    int capacidade = 2;
-    int count = 0;
+    printf(" [+] Iniciando carregamento das regras\n");
+    int capacidade = 2;                    //  variavel para a alocação dinâmica das regras
+    int count = 0;                      // contador de regras válidas cadastradas
 
-    Rule *list = malloc(capacidade * sizeof(Rule));
+    Rule *list = malloc(capacidade * sizeof(Rule));   // alocação inicial das regras
     if(list == NULL){
-        printf("[X] erro de memoria inicial");
+        printf("[X] Erro de memoria inicial");
         fclose(f);
         *total_rules = 0;
         return NULL;
@@ -30,39 +30,42 @@ Rule* load_rules(const char *filename, int *total_rules){
 
     char buffer[256];
     char ip_str[INET_ADDRSTRLEN];
-    while (fgets(buffer, sizeof(buffer), f)){
+    while (fgets(buffer, sizeof(buffer), f)){    // lê o arquivo linha por lnha
 
-        if (strchr(buffer, '\n') == NULL && !feof(f)) {     // verifica se tem alguma linha truncada, se tiver ela sera descartada
+        //proteção contra buffer overflow, caso a linha tenha mais de 256 bytes e não tenha '\n'
+        if (strchr(buffer, '\n') == NULL && !feof(f)) { 
         int c;
-        while ((c = fgetc(f)) != '\n' && c != EOF);
+        while ((c = fgetc(f)) != '\n' && c != EOF);       // vai descartando cada caractere dessa linha truncada até chegar no final dela
         continue; 
         }
+    
+        if(buffer[0] == '#' || buffer[0] == '\n' || buffer[0] == '\r') continue;         // ignora linhas em branco, quebras de linhas ou comentários
 
-        if(buffer[0] == '#' || buffer[0] == '\n' || buffer[0] == '\r') continue; 
-
-        int mask = 32;                                      
+        int mask = 32;         // máscara padrão do ipv4 (caso ela não seja especificada)                                 
         char *token1 = strtok(buffer, " :/\t\n\r");
-        char *token2 = strtok(NULL, " :/\t\n\r");                                                 // variaveis presentes naquela determinada linha (ip, tipo de regra etc)
+        char *token2 = strtok(NULL, " :/\t\n\r");                                                 // variáveis presentes naquela determinada linha (ip, tipo de regra, máscara e verbose)
         char *token3 = strtok(NULL, " :/\t\n\r");                 
         char *token4 = strtok(NULL, " :/\t\n\r");
 
+        // se a linha tiver vazia ou sem argumento válido
         if (token1 == NULL) continue;
 
         Rule r;
-        r.verbose = false;
-        
+        r.verbose = false;                    // por padrão o log detalhado começa desligado 
+
+        // verifica qual o tipo da regra
         if(strcmp(token1, "deny") == 0) r.act = DENY;
-        else if(strcmp(token1, "tarpit") == 0) r.act = TARPIT;
+        else if(strcmp(token1, "tarpit") == 0) r.act = TARPIT;                        
         else if(strcmp(token1, "allow") == 0) r.act = ALLOW;
         else continue;
 
-        if(token3 == NULL && token2 != NULL){     // caso onde so temos o tipo de regra e o ip
+        if(token3 == NULL && token2 != NULL){     // caso onde só temos o tipo de regra e o ip
 
-            if(inet_pton(AF_INET, token2, &r.ip) != 1){
-                printf("[X] erro na conversao do ip {%s}", token2);
+            if(inet_pton(AF_INET, token2, &r.ip) != 1){        // converte a string ip para o formato binário
+                printf("[X] Erro na conversao do ip {%s}", token2);
                 continue;
             }
-            inet_ntop(AF_INET, &r.ip, ip_str, INET_ADDRSTRLEN);
+            inet_ntop(AF_INET, &r.ip, ip_str, INET_ADDRSTRLEN);   // reconverte para string apenas para fins de log e console
             printf("[RULE %d] act=%d verbose=%d ip=%s mask=%d\n", count, r.act, r.verbose, ip_str, mask);
 
         } else if (token3 != NULL){             // caso em que tem o verbose
@@ -70,17 +73,19 @@ Rule* load_rules(const char *filename, int *total_rules){
             if(strcmp(token2, "verbose") == 0){ 
                 r.verbose = true;
 
+                // se tiver um quarto token, vai ser a máscara de sub-rede
                 if (token4 != NULL) mask = atoi(token4);
 
+                // o ip vai ser o terceiro token nesse caso
                 if(inet_pton(AF_INET, token3, &r.ip) != 1){
-                    printf("[X] erro na conversao do ip {%s}", token3);
+                    printf("[X] Erro na conversao do ip {%s}", token3);
                     continue;
                 }
             inet_ntop(AF_INET, &r.ip, ip_str, INET_ADDRSTRLEN);
             printf("[RULE %d] act=%d verbose=%d ip=%s mask=%d\n", count, r.act, r.verbose, ip_str, mask);
 
-            } else {
-                mask = atoi(token3);
+            } else {  // caso não tenha verbose
+                mask = atoi(token3);        //  o token 3 vai ser a máscara de sub-rede
                 if(inet_pton(AF_INET, token2, &r.ip) != 1){
                 printf("[X] erro na conversao do ip {%s}", token2);
                 continue;
@@ -93,11 +98,11 @@ Rule* load_rules(const char *filename, int *total_rules){
             continue;
         }
 
-        r.mask = mask;
-        list[count] = r;
+        r.mask = mask;         // atribui a máscara final na struct Rule
+        list[count] = r;        // adiciona a regra obtida na lista de regras
         count++;
 
-        if(count == capacidade){                  // atualizacao do buffer da lista de acordo com a quantidade de regras
+        if(count == capacidade){                  // atualizacao do buffer da lista de acordo com a quantidade de regras( se atinge a capacidade máxima dele, duplicamos seu tamanho)
             capacidade *= 2;
 
             Rule *temp = realloc(list, capacidade * sizeof(Rule));
@@ -113,5 +118,5 @@ Rule* load_rules(const char *filename, int *total_rules){
     }
     fclose(f);
     *total_rules = count;
-    return list;
+    return list;    // retorna a lista com todas as regras obtidas
 }
