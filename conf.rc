@@ -6,5 +6,6 @@
 # [ação] verbose [ip] -> Com log detalhado
 # caso queira usar um endereço de rede use [network-ip/mask]
 # =====================================================================
+forbidden_words hack malware rootkit
 
 allow 127.0.0.1

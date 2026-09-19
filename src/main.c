@@ -83,7 +83,7 @@ int tun_alloc(char *dev) {
     return fd;
 }
 
-int check_payload(unsigned char *packet, int nread){
+int check_payload(unsigned char *packet, int nread, char **forbidden_words, int num_words){
     struct iphdr *iph = (struct iphdr *)packet;        // cast do cabeçalho ip
     int ip_header_len = iph->ihl * 4;            // multiplicamos o 'ihl' (internet header length) * 4 pra saber o tamanho real (porque ele armazena em blocos de 32bits)
 
@@ -115,9 +115,6 @@ int check_payload(unsigned char *packet, int nread){
 
     if(payload_offset + payload_len > nread) return 0; //pacote truncado/malformatado
 
-    const char *forbidden_words[] = {"hack", "malware", "exploit", "payload"};
-    int num_words = 4;
-
     for(int i = 0; i < num_words; i++){
         int word_len = strlen(forbidden_words[i]);
 
@@ -139,8 +136,10 @@ int main() {
     }
 
     int total_rules = 0;
-    Rule *ip_list = load_rules("conf.rc", &total_rules);    // obtem a lista dos ips presentes no arquivo de configuracao
-
+    char **forbidden_words = NULL;
+    int forbidden_count = 0;
+    Rule *ip_list = load_rules("conf.rc", &total_rules, &forbidden_words, &forbidden_count);    // obtem a lista dos ips presentes no arquivo de configuracao
+    
     if (ip_list == NULL || total_rules <= 0) {
         printf("Falha ao inicializar o firewall. Saindo...\n");
         return 1;
@@ -190,7 +189,7 @@ int main() {
         int malformed = 0;
 
         if(ip->protocol == IPPROTO_TCP || ip->protocol == IPPROTO_UDP){
-            if(check_payload((unsigned char *)buffer, nread) == 1){  // verifica se existe alguma palavra maliciosa no payload
+            if(check_payload((unsigned char *)buffer, nread, forbidden_words, forbidden_count) == 1){  // verifica se existe alguma palavra maliciosa no payload
                 printf("conexao malicionsa pacote dropado\n");
                 continue;
             }
@@ -344,6 +343,10 @@ int main() {
     }
     close(tunfd);
     free(ip_list);
+    for(int i = 0; i < forbidden_count; i++){
+        free(forbidden_words[i]);
+    }
+    free(forbidden_words);
     if(log_file != NULL) fclose(log_file);
     return 0;
 }

@@ -20,6 +20,6 @@ typedef struct
     uint32_t ip;
 } Rule;
 
-Rule* load_rules(const char *filename, int *total_rules);
+Rule* load_rules(const char *filename, int *total_rules, char ***forbidden_words, int *forbidden_count);
 
 #endif
