@@ -65,11 +65,26 @@ git checkout my-firewall
 ```bash
 chmod +x firewall.sh
 make
-sudo ./firewall.sh start
+sudo ./firewall.sh -v start
 ```
 ## Testando o firewall
  
 Como o firewall só enxerga tráfego roteado para a rede `10.0.0.0/24` (ver [Escopo e limitações](#escopo-e-limitações-importantes)), o tráfego de teste precisa ser gerado explicitamente contra a interface `tun0` ou o IP `10.0.0.1`. Algumas formas de fazer isso:
+
+**Configurando Regras**
+
+Modifique o arquivo conf.rc adicionando as suas próprias regras no seguinte formato: 
+
+```bash
+[ação] [ip]/[mask] [verbose]
+Ex: deny 209.22.32.1 verbose
+```
+As ações podem ser : `tarpit, allow, deny`.Os campos `mask`(caso queira indicar a máscara de rede) e `verbose`(caso queira guardar o log daquele ip em `/var/log/my_firewall.log`) são opcionais. Já o campo `forbidden_words` serve para indicar a lista de palavras proibidas (a lista é case sensitive), para adicionar uma palavra na lista basta inserir a palavra logo após a ultima palavra da lista, ou após forbidden_words caso seja a primeira palavra.
+Ex:
+
+```
+forbidden_words hack exploit payload
+```
  
 **Ping (testa a ação `ALLOW` com resposta ICMP):**
 ```bash
@@ -89,7 +104,7 @@ sudo tcpdump -i tun0 -vv
 **Gerando pacotes customizados** (IP de origem forjado, payload específico, flags TCP arbitrárias), útil para testar regras e o filtro de payload malicioso de forma controlada, usando [Scapy](https://scapy.net/):
 ```python
 from scapy.all import *
-send(IP(src="10.0.0.99", dst="10.0.0.1")/TCP(dport=80, flags="S"), iface="tun0")
+send(IP(src="10.0.0.99", dst="10.0.0.1")/TCP(dport=80, flags="S")/Raw(load=b"vou botar um hack no seu pc rsrs"), iface="tun0")
 ```
 ## Experiência com o PSEL
 Minha experiência no geral foi bem interessante, acabei demorando pra finalizar o projeto por conta da disponibilidade, eu fazia uma parte e depois só ia completar depois de alguns dias, mas no fim deu certo.Acho que o mais daora foi poder ver a força que o C tem nesse cenário de manipulação de pacotes e de redes no geral, até pensei em adicionar mais algumas funcionalidades, como o tratamento do IPV6 e algumas técnicas anti-ddos, mas decidir por talvez implementar isso futuramente, até porque já tava demorando demais pra finalizar o código.No geral deu pra aprender bastante e foi uma experiência bem daora.
